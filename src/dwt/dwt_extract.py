@@ -1,17 +1,30 @@
 import pywt
+import numpy as np
 from src.utils.image_utils import from_binary
 
-def extract_dwt(image):
+DELTA = 16
+END_MARKER = '1111111111111110'
+
+
+def extract_dwt_binary(image):
+    image = np.float64(image)
     coeffs = pywt.dwt2(image, 'haar')
     LL, _ = coeffs
 
     binary_data = ""
-
     for i in range(LL.shape[0]):
         for j in range(LL.shape[1]):
-            binary_data += str(int(LL[i][j]) & 1)
+            coeff = LL[i][j]
+            q = int(np.round(coeff / DELTA))
+            binary_data += str(q & 1)
 
-            if binary_data.endswith('1111111111111110'):
-                return from_binary(binary_data[:-16])
+    return binary_data
+
+
+def extract_dwt(image):
+    binary_data = extract_dwt_binary(image)
+    end_idx = binary_data.find(END_MARKER)
+    if end_idx != -1:
+        return from_binary(binary_data[:end_idx])
 
     return ""
