@@ -7,13 +7,17 @@ END_MARKER = '1111111111111110'
 
 
 def dct_capacity(image):
-    h, w = image.shape
+    if image.ndim == 3:
+        h, w = image.shape[:2]
+    else:
+        h, w = image.shape
     return ((h - 7) // 8) * ((w - 7) // 8)
 
 
-def embed_dct_bits(image, binary_secret, start_idx=0):
-    image = np.float32(image)
-    h, w = image.shape
+def embed_dct_bits(channel, binary_secret, start_idx=0):
+    """Embed bits into a single-channel (2D) grayscale image using DCT."""
+    channel = np.float32(channel)
+    h, w = channel.shape
     idx = start_idx
 
     for i in range(0, h - 7, 8):
@@ -21,7 +25,7 @@ def embed_dct_bits(image, binary_secret, start_idx=0):
             if idx >= len(binary_secret):
                 break
 
-            block = image[i:i+8, j:j+8]
+            block = channel[i:i+8, j:j+8]
             dct_block = cv2.dct(block)
 
             coeff = dct_block[4][5]
@@ -34,22 +38,30 @@ def embed_dct_bits(image, binary_secret, start_idx=0):
             dct_block[4][5] = float(q * DELTA)
             idx += 1
 
-            image[i:i+8, j:j+8] = cv2.idct(dct_block)
+            channel[i:i+8, j:j+8] = cv2.idct(dct_block)
 
         if idx >= len(binary_secret):
             break
 
-    stego = np.clip(np.round(image), 0, 255).astype(np.uint8)
+    stego = np.clip(np.round(channel), 0, 255).astype(np.uint8)
     return stego, idx
 
+
 def embed_dct(image, secret):
+    """Embed secret into a color (BGR) image using DCT on the blue channel."""
     binary_secret = to_binary(secret) + END_MARKER
-    capacity = dct_capacity(image)
+
+    # Work on the blue channel (index 0) to preserve color appearance
+    channel = image[:, :, 0].copy()
+    capacity = dct_capacity(channel)
 
     if len(binary_secret) > capacity:
         raise ValueError(
             f"Message too large for image capacity. Bits needed: {len(binary_secret)}, capacity: {capacity}"
         )
 
-    stego, idx = embed_dct_bits(image, binary_secret)
-    return stego
+    stego_channel, _ = embed_dct_bits(channel, binary_secret)
+
+    result = image.copy()
+    result[:, :, 0] = stego_channel
+    return result
