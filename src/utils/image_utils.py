@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 def load_image(path):
-    img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+    img = cv2.imread(path, cv2.IMREAD_COLOR)
     if img is None:
         raise FileNotFoundError(f"Image not found at path: {path}")
     return img

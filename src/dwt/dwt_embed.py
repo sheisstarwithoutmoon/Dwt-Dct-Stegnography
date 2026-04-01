@@ -7,14 +7,19 @@ END_MARKER = '1111111111111110'
 
 
 def dwt_capacity(image):
-    coeffs = pywt.dwt2(image, 'haar')
+    if image.ndim == 3:
+        channel = image[:, :, 0]
+    else:
+        channel = image
+    coeffs = pywt.dwt2(channel, 'haar')
     LL, _ = coeffs
     return LL.shape[0] * LL.shape[1]
 
 
-def embed_dwt_bits(image, binary_secret, start_idx=0):
-    image = np.float64(image)
-    coeffs = pywt.dwt2(image, 'haar')
+def embed_dwt_bits(channel, binary_secret, start_idx=0):
+    """Embed bits into a single-channel (2D) image using DWT."""
+    channel = np.float64(channel)
+    coeffs = pywt.dwt2(channel, 'haar')
     LL, (LH, HL, HH) = coeffs
 
     idx = start_idx
@@ -42,13 +47,20 @@ def embed_dwt_bits(image, binary_secret, start_idx=0):
 
 
 def embed_dwt(image, secret):
+    """Embed secret into a color (BGR) image using DWT on the blue channel."""
     binary_secret = to_binary(secret) + END_MARKER
-    capacity = dwt_capacity(image)
+
+    # Work on the blue channel (index 0) to preserve color appearance
+    channel = image[:, :, 0].copy()
+    capacity = dwt_capacity(channel)
 
     if len(binary_secret) > capacity:
         raise ValueError(
             f"Message too large for image capacity. Bits needed: {len(binary_secret)}, capacity: {capacity}"
         )
 
-    stego, _ = embed_dwt_bits(image, binary_secret)
-    return stego
+    stego_channel, _ = embed_dwt_bits(channel, binary_secret)
+
+    result = image.copy()
+    result[:, :, 0] = stego_channel
+    return result
